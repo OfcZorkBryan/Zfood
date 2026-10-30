@@ -169,10 +169,10 @@ export async function createApp(options={}) {
         }
       }
       if(path.startsWith('/api/')) fail(404,'Rota não encontrada.');
-      const files={'/':'index.html','/index.html':'index.html','/style.css':'style.css','/app.js':'app.js','/favicon.svg':'favicon.svg','/halloween.svg':'halloween.svg'};
+      const files={'/':'index.html','/index.html':'index.html','/style.css':'style.css','/app.js':'app.js','/favicon.svg':'favicon.svg','/halloween.svg':'halloween.svg','/zfood-halloween.png':'zfood-halloween.png'};
       if(!files[path] || !['GET','HEAD'].includes(req.method)) fail(404,'Página não encontrada.');
       const data=await readFile(resolve(root,files[path]));
-      const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml'};
+      const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png'};
       res.writeHead(200,{'Content-Type':types[extname(files[path])]});res.end(req.method==='HEAD'?undefined:data);
     } catch(error) {
       if(!error.status) console.error('Erro interno:',error.message);
