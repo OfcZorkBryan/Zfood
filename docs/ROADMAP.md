@@ -2,7 +2,7 @@
 
 ## Entregue nesta primeira versão
 
-Catálogo demonstrativo, cliente com login, sacola, checkout local, persistência e administração global de pedidos. Tema Halloween responsivo. Repositório compartilhável com CI.
+Catálogo demonstrativo, cliente com login, sacola, checkout local, persistência e administração global de pedidos. Tema Halloween responsivo com ilustrações próprias. Cancelamento antes do preparo, histórico de status, repetir pedido e ordenação por preço. Driver PostgreSQL e comandos de migração preparados; a ativação local exige credenciais válidas. Repositório compartilhável com CI.
 
 ## Próximo: operação de restaurantes
 
