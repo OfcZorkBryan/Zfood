@@ -3,7 +3,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 const money = cents => (cents/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 function saved(key,fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
 function persist(key,value) { try { localStorage.setItem(key,JSON.stringify(value)); } catch { /* O app continua sem armazenamento local. */ } }
-const state={restaurants:[],products:[],user:null,cart:[],coupon:'',favorites:new Set(saved('zfood-favorites',[])),category:'Todos',restaurant:null,query:'',view:'home',authMode:'login',checkoutKey:null,checkoutDraft:{}};
+const state={restaurants:[],products:[],user:null,cart:[],coupon:'',favorites:new Set(saved('zfood-favorites',[])),category:'Todos',restaurant:null,query:'',view:'home',authMode:'login',checkoutKey:null,checkoutDraft:{},orders:[],sort:'featured'};
 let toastTimer,pollTimer;
 function toast(message) { clearTimeout(toastTimer);$('#toast').textContent=message;$('#toast').hidden=false;toastTimer=setTimeout(()=>$('#toast').hidden=true,4000); }
 async function api(path,options={}) {
@@ -35,6 +35,8 @@ function renderCatalog(){
     const haystack=`${p.name} ${p.description} ${r.name} ${p.category}`.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/\p{Diacritic}/gu,'');
     return (state.category==='Todos'||p.category===state.category) && (!state.restaurant||p.restaurantId===state.restaurant) && (!query||haystack.includes(query)) && (state.view!=='favorites'||state.favorites.has(p.id));
   });
+  if(state.sort==='price-asc') list.sort((a,b)=>a.price-b.price);
+  if(state.sort==='price-desc') list.sort((a,b)=>b.price-a.price);
   $('#results-title').textContent=state.view==='favorites'?'Seus favoritos':state.restaurant?state.restaurants.find(r=>r.id===state.restaurant).name:'Favoritos da vizinhança';
   $('#results-count').textContent=`${list.length} opções`;
   $('#products').innerHTML=list.length?list.map(p=>`<article class="product"><div class="product-photo"><img loading="lazy" src="https://images.unsplash.com/${p.image}?auto=format&fit=crop&w=600&q=80" alt="${esc(p.name)}"><span class="image-fallback" hidden>${p.emoji}</span>${p.badge?`<span class="product-badge">${p.badge}</span>`:''}<button class="favorite ${state.favorites.has(p.id)?'saved':''}" data-favorite="${p.id}" aria-label="${state.favorites.has(p.id)?'Remover dos':'Adicionar aos'} favoritos: ${esc(p.name)}" aria-pressed="${state.favorites.has(p.id)}">${state.favorites.has(p.id)?'♥':'♡'}</button></div><div class="product-body"><div class="product-restaurant">${state.restaurants.find(r=>r.id===p.restaurantId).name}</div><h4>${p.name}</h4><p>${p.description}</p><div class="product-bottom"><span class="product-price">${money(p.price)}</span><button class="add-button" data-add="${p.id}" aria-label="Adicionar ${esc(p.name)} à sacola">+</button></div></div></article>`).join(''):'<div class="empty"><span>⌕</span><b>Nenhuma gostosura por aqui ainda.</b><p>Tente outra busca ou salve um prato nos favoritos.</p><button class="secondary" data-reset>Explorar todos os pratos</button></div>';
@@ -77,19 +79,47 @@ const labels={placed:'Pedido recebido',preparing:'Em preparo',delivering:'Saiu p
 function orderCard(o,admin=false){
   const stage=['placed','preparing','delivering','delivered'].indexOf(o.status);
   const next={placed:'preparing',preparing:'delivering',delivering:'delivered'}[o.status];
-  return `<article class="order"><div class="order-head"><div><b>${esc(o.number)} · ${esc(o.restaurant)}</b><small>${new Date(o.createdAt).toLocaleString('pt-BR')}</small></div><span class="status ${o.status}">${labels[o.status]}</span></div>${o.status!=='canceled'?`<div class="progress" aria-label="Etapa ${stage+1} de 4">${[0,1,2,3].map(i=>`<span class="${i<=stage?'done':''}"></span>`).join('')}</div>`:''}<div class="order-items">${o.items.map(i=>`${i.quantity}× ${esc(i.name)} · ${money(i.price*i.quantity)}`).join('<br>')}</div><div class="order-foot"><span>${esc(o.address)}</span><b>${money(o.total)} · na entrega</b></div>${o.notes?`<div class="order-details">Observações: ${esc(o.notes)}</div>`:''}${admin?`<div class="order-details">${esc(o.customer)} · ${esc(o.phone)}<br>Subtotal ${money(o.subtotal)} · Entrega ${money(o.fee)} · Desconto ${money(o.discount)}</div><div class="order-actions">${next?`<button class="primary" data-status="${next}" data-order="${o.id}">${labels[next]} →</button>`:''}${['placed','preparing'].includes(o.status)?`<button class="secondary" data-status="canceled" data-order="${o.id}">Cancelar pedido</button>`:''}</div>`:''}</article>`;
+  const markup = `<article class="order"><div class="order-head"><div><b>${esc(o.number)} · ${esc(o.restaurant)}</b><small>${new Date(o.createdAt).toLocaleString('pt-BR')}</small></div><span class="status ${o.status}">${labels[o.status]}</span></div>${o.status!=='canceled'?`<div class="progress" aria-label="Etapa ${stage+1} de 4">${[0,1,2,3].map(i=>`<span class="${i<=stage?'done':''}"></span>`).join('')}</div>`:''}<div class="order-items">${o.items.map(i=>`${i.quantity}× ${esc(i.name)} · ${money(i.price*i.quantity)}`).join('<br>')}</div><div class="order-foot"><span>${esc(o.address)}</span><b>${money(o.total)} · na entrega</b></div>${o.notes?`<div class="order-details">Observações: ${esc(o.notes)}</div>`:''}${admin?`<div class="order-details">${esc(o.customer)} · ${esc(o.phone)}<br>Subtotal ${money(o.subtotal)} · Entrega ${money(o.fee)} · Desconto ${money(o.discount)}</div><div class="order-actions">${next?`<button class="primary" data-status="${next}" data-order="${o.id}">${labels[next]} →</button>`:''}${['placed','preparing'].includes(o.status)?`<button class="secondary" data-status="canceled" data-order="${o.id}">Cancelar pedido</button>`:''}</div>`:''}</article>`;
+  return markup.replace('</article>',orderExtras(o,admin)+'</article>');
 }
+
+function orderExtras(order,admin){
+  const history=order.history || [{status:'placed',at:order.createdAt,actor:'customer'}];
+  const timeline='<ol class="order-timeline" aria-label="Histórico do pedido">'+history.map(event=>'<li><b>'+esc(labels[event.status]||event.status)+'</b>'+new Date(event.at).toLocaleString('pt-BR')+' · '+(event.actor==='admin'?'Restaurante':'Cliente')+'</li>').join('')+'</ol>';
+  const actions=admin?'':'<div class="order-actions"><button class="secondary" data-reorder="'+order.id+'">Pedir novamente ↻</button>'+(order.status==='placed'?'<button class="secondary" data-cancel="'+order.id+'">Cancelar pedido</button>':'')+'</div>';
+  return timeline+actions;
+}
+function confirmAction(title,message,label){
+  return new Promise(resolve=>{
+    const dialog=document.createElement('dialog');dialog.className='confirm-dialog';
+    dialog.innerHTML='<h2>'+esc(title)+'</h2><p>'+esc(message)+'</p><div class="confirm-actions"><button class="secondary" data-no>Voltar</button><button class="primary" data-yes>'+esc(label)+'</button></div>';
+    document.body.append(dialog);let confirmed=false;
+    dialog.querySelector('[data-yes]').onclick=()=>{confirmed=true;dialog.close();};
+    dialog.querySelector('[data-no]').onclick=()=>dialog.close();
+    dialog.addEventListener('close',()=>{dialog.remove();resolve(confirmed);},{once:true});
+    dialog.showModal();dialog.querySelector('[data-no]').focus();
+  });
+}
+
 async function loadOrders(admin=false){
   const target=$(admin?'#admin-list':'#orders-list');
+  const accountId=state.user?.id;
+  if(target.dataset.account!==accountId){
+    target.replaceChildren();
+    if(!admin)state.orders=[];
+    target.dataset.account=accountId || '';
+  }
   if(!state.user){target.innerHTML='<div class="empty"><span>🧾</span><p>Entre para acompanhar os seus pedidos.</p><button class="primary" data-login>Entrar na minha conta</button></div>';return;}
   try{
     const {orders}=await api(admin?'/api/admin/orders':'/api/orders');
+    if(state.user?.id!==accountId)return;
+    if(!admin) state.orders=orders;
     target.innerHTML=orders.length?orders.map(o=>orderCard(o,admin)).join(''):'<div class="empty"><span>🧾</span><b>Ainda não há pedidos por aqui.</b><p>Os próximos pedidos vão aparecer neste espaço.</p></div>';
     if(admin){
       const active=orders.filter(o=>!['delivered','canceled'].includes(o.status));
       $('#admin-stats').innerHTML=`<div class="admin-stat"><b>${active.length}</b><small>Em andamento</small></div><div class="admin-stat"><b>${orders.filter(o=>o.status==='delivered').length}</b><small>Entregues</small></div><div class="admin-stat"><b>${money(orders.filter(o=>o.status!=='canceled').reduce((sum,o)=>sum+o.total,0))}</b><small>Total de pedidos não cancelados</small></div>`;
     }
-  }catch(error){target.innerHTML=`<p class="form-error">${esc(error.message)}</p>`;}
+  }catch(error){if(state.user?.id===accountId)target.innerHTML=`<p class="form-error">${esc(error.message)}</p>`;}
 }
 function view(name){
   if(name==='admin' && state.user?.role!=='admin') return;
@@ -125,14 +155,29 @@ document.addEventListener('click',async event=>{
   if(button.hasAttribute('data-login')){auth();return;}
   if(button.id==='account'){
     if(!state.user){auth();return;}
-    try{await api('/api/logout',{method:'POST',body:{}});state.user=null;state.checkoutDraft={};$('#cart-content').replaceChildren();updateAccount();view('home');toast('Você saiu da sua conta.');}catch(error){toast(error.message);}return;
+    try{await api('/api/logout',{method:'POST',body:{}});state.user=null;state.orders=[];state.checkoutDraft={};document.querySelectorAll('#orders-list,#admin-list,#admin-stats').forEach(el=>{el.replaceChildren();delete el.dataset.account;});$('#cart-content').replaceChildren();updateAccount();view('home');toast('Você saiu da sua conta.');}catch(error){toast(error.message);}return;
   }
   if(button.id==='refresh-orders'||button.id==='refresh-admin'){await loadOrders(button.id==='refresh-admin');return;}
+  if(button.dataset.reorder){
+    const order=state.orders.find(o=>o.id===button.dataset.reorder);if(!order)return;
+    if(order.items.some(i=>!state.products.some(p=>p.id===i.id))){toast('Um dos pratos não está mais no cardápio. Escolha um novo pedido.');return;}
+    if(state.cart.length && !await confirmAction('Substituir a sacola?','Os itens atuais serão trocados pelos pratos deste pedido.','Substituir sacola'))return;
+    state.cart=order.items.map(i=>({id:i.id,quantity:Math.min(20,i.quantity)}));state.coupon='';
+    state.checkoutDraft={address:order.address,phone:order.phone,notes:order.notes,payment:'cash'};
+    $('#cart-content').replaceChildren();saveCart();renderCart();$('#cart-dialog').showModal();
+    toast('Pedido na sacola com os preços atuais. Revise antes de confirmar.');return;
+  }
+  if(button.dataset.cancel){
+    if(!await confirmAction('Cancelar este pedido?','O cancelamento só é permitido enquanto o restaurante ainda não iniciou o preparo.','Cancelar pedido'))return;
+    button.disabled=true;
+    try{await api('/api/orders/'+button.dataset.cancel+'/cancel',{method:'POST',body:{}});await loadOrders();toast('Pedido cancelado.');}catch(error){toast(error.message);await loadOrders();}return;
+  }
   if(button.dataset.status){
     button.disabled=true;
     try{await api(`/api/admin/orders/${button.dataset.order}`,{method:'PATCH',body:{status:button.dataset.status}});await loadOrders(true);toast('Status atualizado.');}catch(error){toast(error.message);button.disabled=false;}
   }
 });
+$('#sort').addEventListener('change',event=>{state.sort=event.target.value;renderCatalog();});
 $('#search').addEventListener('input',event=>{state.query=event.target.value;renderCatalog();});
 document.addEventListener('keydown',event=>{if(event.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!$('dialog[open]')){event.preventDefault();view('home');$('#search').focus();}});
 document.addEventListener('submit',async event=>{

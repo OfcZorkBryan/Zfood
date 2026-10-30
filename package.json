@@ -4,6 +4,19 @@
   "private": true,
   "type": "module",
   "description": "Delivery Zfood — edição Halloween",
-  "engines": { "node": ">=24.11.0" },
-  "scripts": { "start": "node src/server.js", "dev": "node --watch src/server.js", "test": "node --test", "check": "node --check src/server.js && node --check public/app.js" }
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "dev": "node --env-file-if-exists=.env --watch src/server.js",
+    "test": "node --test",
+    "test:postgres": "node --env-file-if-exists=.env --test tests/postgres.test.js",
+    "db:setup": "node --env-file-if-exists=.env scripts/database.mjs setup",
+    "db:migrate": "node --env-file-if-exists=.env scripts/database.mjs migrate",
+    "check": "node --check src/server.js && node --check public/app.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
 }

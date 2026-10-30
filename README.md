@@ -4,11 +4,12 @@ Delivery de comida — primeira versão local, com edição Halloween. Projeto c
 
 ## Executar
 
-Instale **Node.js 24.11 ou superior**. Não há pacotes de execução para instalar.
+Instale **Node.js 24.11 ou superior**. O driver PostgreSQL é instalado pelo npm.
 
 ```sh
 git clone https://github.com/OfcZorkBryan/Zfood.git
 cd Zfood
+npm ci
 npm start
 ```
 
@@ -30,6 +31,9 @@ O Node 24 pode exibir o aviso de recurso experimental do SQLite nativo; os dados
 - Checkout com endereço, telefone, observações e dinheiro na entrega.
 - Preços recalculados pelo servidor; repetição do mesmo checkout não duplica o pedido.
 - Histórico de pedidos por cliente; atualização do status a cada 15 segundos quando a página está visível.
+- Histórico com horários e responsável pelas mudanças; cancelamento pelo cliente antes do preparo.
+- Pedir novamente, revisando os preços atuais e confirmando a troca se a sacola já tiver itens.
+- Ordenação por menor/maior preço combinada com busca e categorias.
 - Gestão administrativa: recebimento → preparo → entrega → entregue, com cancelamento antes da saída.
 - SQLite persistente: contas e pedidos sobrevivem ao reinício do servidor.
 
@@ -67,6 +71,10 @@ docs/         Escopo, plano e próximos marcos
 ```
 
 Valores monetários são inteiros em centavos. Senhas usam scrypt com salt; tokens de sessão são aleatórios e apenas o hash é salvo no banco. Queries usam parâmetros. A aplicação escuta somente em loopback para desenvolvimento.
+
+## PostgreSQL e pgAdmin
+
+O pgAdmin é o gerenciador; o aplicativo conecta diretamente ao PostgreSQL. Veja [a configuração e migração](docs/POSTGRESQL.md). Sem configuração, continua disponível o SQLite. Com `ZFOOD_STORAGE=postgres`, o PostgreSQL passa a ser a fonte dos dados; não há sincronização contínua entre dois bancos.
 
 ## Próximos marcos
 
