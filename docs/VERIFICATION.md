@@ -19,3 +19,13 @@ O banco local usado em QA contém apenas uma conta e um pedido fictícios. Ele e
 - Revisão apontou cache de pedidos atravessando troca de conta: listas/cache agora são limpos ao sair, e respostas assíncronas são descartadas se a conta mudou.
 - Suíte local: 2 testes passam; 1 teste PostgreSQL é ignorado enquanto não houver credenciais. CI configurada com PostgreSQL 18 para executar esse teste.
 - Integração PostgreSQL e migração preparadas. `db:setup` interrompe com instrução clara se `PGPASSWORD` estiver vazia. Até o preenchimento da senha, o banco `zfood` não foi criado/migrado localmente; a prévia continua usando SQLite.
+
+## Demonstração ampliada
+
+- Mais fotos locais, combos, banners de cupons e fontes locais Manrope/Sora.
+- Perfil e endereço fictício cadastrados pelo navegador. Seleção no checkout preserva o endereço completo no pedido.
+- Checkout Pix demo com BOO15: subtotal R$ 119,70 + taxa R$ 5,99 − desconto R$ 17,96 = R$ 107,73. Aprovação simulada conferida no histórico.
+- Dinheiro com troco: campos preservados ao aumentar quantidade; pedido de R$ 101,79 com troco para R$ 150,00 conferido.
+- Corrigidos recarregamento do formulário durante edição, telefone formatado incompleto aceito pelo perfil, fotografia de bebida inválida e fotografia de donuts incorreta.
+- Revisão independente verificou isolamento dos endereços e pagamentos; a regressão de telefone está coberta por teste.
+- Suíte ampliada inclui o mesmo fluxo de perfil/pagamento em PostgreSQL e migração com perfil/endereço, executados pela CI. Localmente esses testes dependem das credenciais PostgreSQL.

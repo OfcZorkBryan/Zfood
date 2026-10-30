@@ -19,13 +19,13 @@ npm run db:migrate
 npm start
 ```
 
-A migração lê `data/zfood.sqlite` e copia contas (preservando os hashes de senha) e pedidos em uma transação. Não altera a origem. O destino deve estar vazio; se já houver contas, sessões ou pedidos, ela para sem substituir registros. Sessões antigas não são copiadas: faça login novamente.
+A migração lê `data/zfood.sqlite` e copia contas (preservando os hashes de senha), pedidos, perfis e endereços em uma transação. Não altera a origem. O destino deve estar vazio; se já houver registros, ela para sem substituir dados. Sessões antigas não são copiadas: faça login novamente. Origens de versões anteriores sem as tabelas de perfil/endereço continuam aceitas.
 
 Para outra origem SQLite, configure `ZFOOD_SQLITE_SOURCE`. Não execute gravações no SQLite depois da troca de banco: esses dados posteriores não serão replicados automaticamente.
 
 ## Ver no pgAdmin
 
-No servidor **PostgreSQL 18** (`localhost:5432`), atualize **Databases**. Abra **zfood → Schemas → public → Tables**. Use o Query Tool:
+No servidor **PostgreSQL 18** (`localhost:5432`), atualize **Databases**. Abra **zfood → Schemas → public → Tables**. As tabelas são `users`, `sessions`, `orders`, `customer_profiles` e `addresses`. Use o Query Tool:
 
 ```sql
 SELECT id, name, email, role FROM users;

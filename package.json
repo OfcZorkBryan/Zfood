@@ -14,7 +14,7 @@
     "test:postgres": "node --env-file-if-exists=.env --test tests/postgres.test.js",
     "db:setup": "node --env-file-if-exists=.env scripts/database.mjs setup",
     "db:migrate": "node --env-file-if-exists=.env scripts/database.mjs migrate",
-    "check": "node --check src/server.js && node --check public/app.js"
+    "check": "node --check src/server.js && node --check src/customer.js && node --check public/app.js && node --check public/customer-ui.js && node --check public/pricing.js && node --check scripts/database.mjs"
   },
   "dependencies": {
     "pg": "^8.23.1"

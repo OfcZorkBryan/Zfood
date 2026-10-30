@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { restaurants, products } from './catalog.js';
 import { openStore, openPostgres, hashPassword, checkPassword } from './store.js';
+import {coupons,quote} from '../public/pricing.js';
+import {customerRoutes,formatAddress} from './customer.js';
 
 const root = fileURLToPath(new URL('../public/',import.meta.url));
 const fail = (status,message) => { throw Object.assign(new Error(message),{status}); };
@@ -65,7 +67,8 @@ export async function createApp(options={}) {
           if(req.headers.origin!==expected) fail(403,'Origem não permitida.');
         }
       }
-      if(path==='/api/catalog' && req.method==='GET') return send(res,200,{restaurants,products});
+      if(path==='/api/catalog' && req.method==='GET') return send(res,200,{restaurants,products,coupons});
+      if(await customerRoutes(req,res,path,{db,user,body,send,text,fail}))return;
       if(['/api/register','/api/login'].includes(path) && req.method==='POST') {
         const ip=req.socket.remoteAddress;
         const now=Date.now();
@@ -121,15 +124,19 @@ export async function createApp(options={}) {
         if(new Set(items.map(i=>i.restaurantId)).size!==1) fail(400,'Escolha itens de um restaurante por pedido.');
         const restaurant=restaurants.find(r=>r.id===items[0].restaurantId);
         const coupon=typeof data.coupon==='string'?data.coupon.trim().toUpperCase():'';
-        if(coupon && coupon!=='HALLOWEEN10') fail(400,'Cupom não encontrado. Use HALLOWEEN10.');
-        const subtotal=items.reduce((sum,i)=>sum+i.price*i.quantity,0);
-        const discount=coupon ? Math.round(subtotal*.1):0;
-        if(data.payment!=='cash') fail(400,'Nesta versão, o pagamento é na entrega.');
-        const address=text(data.address,10,250,'Endereço');
+        let calculation;
+        try{calculation=quote(items,restaurant.fee,coupon);}catch(error){fail(400,error.message);}
+        const {subtotal,discount,total}=calculation;
+        if(!['cash','card_demo','pix_demo','card_delivery'].includes(data.payment)) fail(400,'Escolha uma forma de pagamento disponível.');
+        let address;
+        if(data.addressId){const addressId=text(data.addressId,1,100,'Endereço');const saved=await db.prepare('SELECT payload FROM addresses WHERE id=? AND user_id=?').get(addressId,u.id);if(!saved)fail(404,'Endereço não encontrado.');address=formatAddress(JSON.parse(saved.payload));}
+        else address=text(data.address,10,600,'Endereço');
         const phone=text(data.phone,10,20,'Telefone');
         if(!/^\+?[\d\s()-]+$/.test(phone) || phone.replace(/\D/g,'').length<10) fail(400,'Informe um telefone válido com DDD.');
         const notes=data.notes ? text(data.notes,0,500,'Observações'):'';
-        const order={id:randomUUID(),number:`ZF-${randomBytes(3).toString('hex').toUpperCase()}`,customer:u.name,items,restaurant:restaurant.name,subtotal,discount,fee:restaurant.fee,total:subtotal-discount+restaurant.fee,coupon,address,phone,notes,payment:'cash',status:'placed',createdAt:new Date().toISOString()};
+        const changeFor=data.payment==='cash'&&data.changeFor?Number(data.changeFor):null;
+        if(changeFor!==null&&(!Number.isInteger(changeFor)||changeFor<total||changeFor>100000))fail(400,'O valor para troco precisa cobrir o total do pedido.');
+        const order={id:randomUUID(),number:`ZF-${randomBytes(3).toString('hex').toUpperCase()}`,customer:u.name,items,restaurant:restaurant.name,subtotal,discount,fee:restaurant.fee,total,coupon,address,phone,notes,payment:data.payment,paymentStatus:data.payment==='pix_demo'?'pending_demo':data.payment==='card_demo'?'approved_demo':'pay_on_delivery',changeFor,status:'placed',createdAt:new Date().toISOString()};
         order.history=[{status:'placed',at:order.createdAt,actor:'customer'}];
         const inserted=await db.prepare('INSERT INTO orders (id,user_id,request_key,payload) VALUES (?,?,?,?) ON CONFLICT(user_id,request_key) DO NOTHING').run(order.id,u.id,key,JSON.stringify(order));
         if(!inserted.changes) {
@@ -139,6 +146,18 @@ export async function createApp(options={}) {
         return send(res,201,{order});
       }
       const cancelMatch=path.match(/^\/api\/orders\/([^/]+)\/cancel$/);
+      const payMatch=path.match(/^\/api\/orders\/([^/]+)\/demo-payment$/);
+      if(payMatch&&req.method==='POST'){
+        const u=await user(req);await body(req);
+        const row=await db.prepare('SELECT payload FROM orders WHERE id=? AND user_id=?').get(payMatch[1],u.id);
+        if(!row)fail(404,'Pedido não encontrado.');const order=JSON.parse(row.payload);
+        if(order.status==='canceled'||order.payment!=='pix_demo')fail(409,'Este pedido não aceita pagamento Pix demonstrativo.');
+        if(order.paymentStatus==='approved_demo')return send(res,200,{order});
+        order.paymentStatus='approved_demo';order.paidAt=new Date().toISOString();
+        const changed=await db.prepare('UPDATE orders SET payload=? WHERE id=? AND payload=?').run(JSON.stringify(order),order.id,row.payload);
+        if(!changed.changes)fail(409,'Pedido atualizado. Confira antes de continuar.');
+        return send(res,200,{order});
+      }
       if(cancelMatch && req.method==='POST') {
         const u=await user(req);
         await body(req);
@@ -162,6 +181,7 @@ export async function createApp(options={}) {
           const order=JSON.parse(row.payload);
           const allowed={placed:['preparing','canceled'],preparing:['delivering','canceled'],delivering:['delivered'],delivered:[],canceled:[]};
           if(!allowed[order.status]?.includes(data.status)) fail(400,'Esta mudança de status não é permitida.');
+          if(data.status==='preparing'&&order.paymentStatus==='pending_demo')fail(409,'Simule a confirmação do Pix antes de iniciar o preparo.');
           recordStatus(order,data.status,'admin');
           const updated=await db.prepare('UPDATE orders SET payload=? WHERE id=? AND payload=?').run(JSON.stringify(order),id,row.payload);
           if(!updated.changes) fail(409,'O pedido foi atualizado. Confira o status antes de continuar.');
@@ -169,10 +189,11 @@ export async function createApp(options={}) {
         }
       }
       if(path.startsWith('/api/')) fail(404,'Rota não encontrada.');
-      const files={'/':'index.html','/index.html':'index.html','/style.css':'style.css','/app.js':'app.js','/favicon.svg':'favicon.svg','/halloween.svg':'halloween.svg','/zfood-halloween.png':'zfood-halloween.png'};
+      const files={'/':'index.html','/index.html':'index.html','/style.css':'style.css','/app.js':'app.js','/pricing.js':'pricing.js','/customer-ui.js':'customer-ui.js','/favicon.svg':'favicon.svg','/halloween.svg':'halloween.svg','/zfood-halloween.png':'zfood-halloween.png'};
+      if(/^\/media\/[a-z0-9-]+\.jpg$/.test(path)||/^\/fonts\/[a-z0-9-]+\.ttf$/.test(path))files[path]=path.slice(1);
       if(!files[path] || !['GET','HEAD'].includes(req.method)) fail(404,'Página não encontrada.');
-      const data=await readFile(resolve(root,files[path]));
-      const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png'};
+      const data=await readFile(resolve(root,files[path])).catch(error=>{if(error.code==='ENOENT')fail(404,'Arquivo não encontrado.');throw error;});
+      const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.ttf':'font/ttf'};
       res.writeHead(200,{'Content-Type':types[extname(files[path])]});res.end(req.method==='HEAD'?undefined:data);
     } catch(error) {
       if(!error.status) console.error('Erro interno:',error.message);

@@ -24,11 +24,16 @@ O Node 24 pode exibir o aviso de recurso experimental do SQLite nativo; os dados
 
 ## O que funciona
 
-- Catálogo demonstrativo de 4 restaurantes e 10 pratos, busca e categorias.
+- Catálogo demonstrativo de 4 restaurantes e 14 opções, incluindo combos, busca e categorias.
 - Favoritos e sacola conservados no navegador.
 - Pedidos por restaurante, ajuste de quantidade e desconto `HALLOWEEN10` de 10% no subtotal.
 - Cadastro, login, logout e sessões em cookie HttpOnly.
-- Checkout com endereço, telefone, observações e dinheiro na entrega.
+- Perfil do cliente e endereços privados, com edição, exclusão e escolha do padrão.
+- Checkout com endereço salvo ou manual, telefone, observações, cupons e troco.
+- Pix e cartão de teste inteiramente demonstrativos, além de dinheiro/cartão na entrega. Nenhum dado real de cartão é solicitado.
+- Pix tem confirmação simulada pelo cliente; o preparo aguarda essa simulação.
+- Promoções HALLOWEEN10, BOO15 e FRETEGRATIS, com regras verificadas pelo servidor.
+- Fontes Manrope e Sora locais, fotografias locais e navegação de celular com atalho da sacola.
 - Preços recalculados pelo servidor; repetição do mesmo checkout não duplica o pedido.
 - Histórico de pedidos por cliente; atualização do status a cada 15 segundos quando a página está visível.
 - Histórico com horários e responsável pelas mudanças; cancelamento pelo cliente antes do preparo.
@@ -37,7 +42,7 @@ O Node 24 pode exibir o aviso de recurso experimental do SQLite nativo; os dados
 - Gestão administrativa: recebimento → preparo → entrega → entregue, com cancelamento antes da saída.
 - SQLite persistente: contas e pedidos sobrevivem ao reinício do servidor.
 
-**Este ambiente não envia pedidos a restaurantes reais e não cobra pagamentos.** Restaurantes, notas, prazos, imagens e produtos são ilustrativos. Fotos remotas de alimentos pelo Unsplash, com alternativa visual em caso de falha.
+**Este ambiente não envia pedidos a restaurantes reais e não cobra pagamentos.** Restaurantes, notas, prazos, imagens e produtos são ilustrativos. Fotografias ilustrativas do Unsplash armazenadas localmente. Fontes com licença OFL em public/fonts. A arte da marca foi fornecida pelo proprietário.
 
 ## Painel administrativo
 
